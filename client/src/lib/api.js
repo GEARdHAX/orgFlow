@@ -1,8 +1,11 @@
 import axios from 'axios';
 
+// Use Vite env variable correctly
+const baseURL = import.meta.env.VITE_BACKEND_URL || 'https://orgflow.onrender.com';
+
 const api = axios.create({
-    baseURL: `${import.meta.env.VITE_BACKEND_URL}/api`, // Your backend URL
-    withCredentials: true, // This sends cookies with every request!
+    baseURL: `${baseURL}/api`,
+    withCredentials: true, // sends cookies with every request
 });
 
 export default api;

@@ -31,7 +31,7 @@ const employeeSchema = new mongoose.Schema({
     },
     photoUrl: {
         type: String,
-        default: '/uploads/default.png'
+        default: '../uploads/default.png'
     }
 }, { timestamps: true });
 
