@@ -75,14 +75,14 @@ app.use(session({
     cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1 day
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'none' // <-- ADD THIS LINE
+        secure: process.env.NODE_ENV === 'production', // must be true in production
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // must be 'none' for cross-site cookies in production
     }
 }));
 
 // Initialize Passport
 app.use(passport.initialize());
-app.use(passport.session());
+app.use(passport.session())
 
 // --- Static Asset Serving ---
 // __dirname is fine in CommonJS (require syntax)
@@ -98,7 +98,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 // --- Start Server ---
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });

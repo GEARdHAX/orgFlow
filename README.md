@@ -1,83 +1,143 @@
-# OrgFlow 🚀  
+# OrgFlow 🚀
+
 A Modern Organization Management & Hierarchy Visualization System
 
 **OrgFlow** is a full-stack web application designed to help organizations manage employees, maintain structure, and visualize hierarchical relationships in a clean and interactive interface.
 
 ---
 
-## ✨ Features
+## ⚠️ Authentication Issue Resolved — Why You Got 401 Errors (Important)
+
+### **The Problem: Why 401 Unauthorized Happened**
+
+Your browser was **not sending the session cookie** back to the server after login.
+
+**What was happening step-by-step:**
+
+* **Login:** The server created a session and sent a session cookie to the browser.
+* **Cookie Rejected:** The cookie used `sameSite: 'none'`, but modern browsers require such cookies to also use `secure: true` (HTTPS only).
+* **Conflict:** In development, you're using `http://localhost` (not HTTPS).
+* **Browser Block:** The browser refused the cookie because it was considered insecure.
+* **Result:** Future API calls had **no session cookie**, so the server returned **401 Unauthorized**.
+
+---
+
+### **The Solution: Environment-Based Cookie Settings**
+
+Your `server.js` was updated to adjust cookie security depending on whether you're running locally (dev) or deployed (production).
+
+```js
+app.use(session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({ mongoUrl: process.env.DATABASE_URL }),
+    cookie: {
+        maxAge: 1000 * 60 * 60 * 24,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    }
+}));
+```
+
+### **How This Fix Works**
+
+#### **In Development (localhost)**
+
+* `secure: false`
+* `sameSite: 'lax'`
+
+Browsers accept the cookie on HTTP during development → login works normally.
+
+#### **In Production**
+
+* `secure: true`
+* `sameSite: 'none'`
+
+Correct, secure configuration for deployed HTTPS environments → supports cross-domain cookies.
+
+This ensures compatibility with browser security rules in both environments and prevents the 401 Unauthorized errors you were facing.
+
+---
+
+# ✨ Features
 
 ### 🔐 Secure Authentication
-- Admin login using **JWT + HTTP-only cookies**
-- Protected admin routes
-- Automatic redirect handling
+
+* Admin login using **JWT + HTTP-only cookies**
+* Protected admin routes
+* Automatic redirect handling
 
 ### 👥 Employee Management
-- Add employees (name, email, role, department)
-- Assign reporting hierarchy (`reportsTo`)
-- Upload profile pictures (Cloudinary)
-- Edit and delete employees
-- Modal-based employee details view
+
+* Add employees
+* Assign hierarchy
+* Cloudinary image uploads
+* Edit & delete
+* View details via modal
 
 ### 🗂️ Dynamic Organization Chart
-- Auto-generated hierarchical tree from DB
-- Interactive org chart using **jQuery.orgchart**
-- Smooth **pan & zoom**
-- Click nodes to view full employee profile
-- Infinite canvas movement (Figma-like UX)
+
+* Auto-generated tree
+* Interactive org chart
+* Pan & zoom
+* Infinite canvas movement
+* Click nodes for details
 
 ### 📊 Admin Dashboard
-- Overview metrics
-- Quick management actions
-- Clean and responsive layout
+
+* Overview metrics
+* Quick controls
+* Clean responsive UI
 
 ### 🎨 Modern UI/UX
-- **React + Tailwind CSS**
-- Premium **glassmorphism** theme
-- Works on all devices
-- Minimal, beautiful, and intuitive
+
+* React + Tailwind
+* Glassmorphism theme
+* Fully responsive
+* Smooth interactions
 
 ### ⚙️ Robust Backend
-- **Node.js + Express**
-- MongoDB with Mongoose
-- JWT authentication flow
-- Cloudinary file uploads
-- Multer for form-data handling
+
+* Express + MongoDB
+* JWT auth
+* Cloudinary uploads
+* Multer handling
+* Async error wrapper
 
 ---
 
 ## 🛠️ Technologies Used
 
 ### Frontend
-- React.js  
-- React Router DOM  
-- Zustand (state management)  
-- Axios  
-- Tailwind CSS  
-- Lucide Icons  
-- jQuery.orgchart  
+
+* React.js
+* Zustand
+* Axios
+* Tailwind CSS
+* Lucide Icons
+* jQuery.orgchart
 
 ### Backend
-- Node.js  
-- Express.js  
-- MongoDB + Mongoose  
-- JSON Web Tokens  
-- Bcrypt  
-- Cloudinary  
-- Multer + Multer-Cloudinary  
-- Express-async-handler  
-- Cookie-parser  
-- CORS  
-- Dotenv  
+
+* Node.js / Express
+* MongoDB + Mongoose
+* JWT + Bcrypt
+* Cloudinary
+* Multer
+* CORS
+* Cookie-parser
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js (v18+)  
-- MongoDB Atlas or local MongoDB  
-- Cloudinary account  
+
+* Node.js v18+
+* MongoDB Atlas or local
+* Cloudinary
 
 ---
 
@@ -86,7 +146,7 @@ A Modern Organization Management & Hierarchy Visualization System
 ```bash
 git clone <your-repo-url>
 cd orgflow
-````
+```
 
 ---
 
@@ -97,30 +157,23 @@ cd server
 npm install
 ```
 
-### Create `.env` in `/server`:
+### Add `.env`
 
 ```env
 PORT=5000
 MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-JWT_EXPIRES_IN=1d
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+SESSION_SECRET=your_secret
+DATABASE_URL=your_mongo_url
 CLIENT_URL=http://localhost:3000
 ```
 
-### Run the Backend
+### Start Backend
 
 ```bash
 npm start
 ```
 
-Backend runs at:
-
-```
-http://localhost:5000
-```
+Backend → `http://localhost:5000`
 
 ---
 
@@ -131,23 +184,19 @@ cd ../client
 npm install
 ```
 
-### Create `.env` in `/client`:
+### Add `.env`
 
 ```env
-REACT_APP_BACKEND_URL=http://localhost:5000
+VITE_BACKEND_URL=http://localhost:5000
 ```
 
-### Run the Frontend
+### Start Frontend
 
 ```bash
-npm start
+npm run dev
 ```
 
-Frontend runs at:
-
-```
-http://localhost:3000
-```
+Frontend → `http://localhost:3000`
 
 ---
 
@@ -155,32 +204,29 @@ http://localhost:3000
 
 ### Backend → Render
 
-* Root Directory: **server**
+* Root: `server`
 * Build: `npm install`
 * Start: `npm start`
-* Add all environment variables
-* Set `CLIENT_URL` to your Vercel frontend URL
+* Add all env variables
+* `CLIENT_URL` = your Vercel domain
 
 ### Frontend → Vercel
 
-* Root Directory: **client**
-* Add environment variable:
-
-  * `REACT_APP_BACKEND_URL = <render-backend-url>`
+* Root: `client`
+* Add env variable
+  `VITE_BACKEND_URL = <render-url>`
 
 ---
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome!
-Open an issue or submit a pull request.
+Issues and PRs are welcome.
 
 ---
 
 ## 📝 License
 
-This project is **Unlicensed**.
-You are free to use, modify, distribute without restrictions.
+Unlicensed — free to use, modify, and distribute.
 
 ---
 
