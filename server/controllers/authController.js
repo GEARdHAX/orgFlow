@@ -1,110 +1,112 @@
+// controllers/authController.js
+
 const passport = require('passport');
+const asyncHandler = require('express-async-handler');
 const User = require('../models/userModel');
 
-// @desc    Register a new admin user
-// @route   POST /api/auth/register
-// @access  Public (or protected, you decide)
-// NOTE: You only need to run this once or twice to create your admin accounts.
-// You might want to remove this endpoint in production.
-const registerUser = async (req, res) => {
-    const { username, password, role } = req.body;
+/**
+ * Register a new user
+ * POST /api/auth/register
+ */
+exports.registerUser = asyncHandler(async (req, res) => {
+    const { username, password, ...rest } = req.body;
 
-    try {
-        const userExists = await User.findOne({ username });
-        if (userExists) {
-            return res.status(400).json({ message: 'Username already exists' });
-        }
-
-        const user = new User({
-            username,
-            password, // Password will be hashed by the 'pre-save' hook in the model
-            role: role || 'admin'
-        });
-
-        const savedUser = await user.save();
-
-        // Log the user in immediately after registration
-        req.login(savedUser, (err) => {
-            if (err) {
-                return res.status(500).json({ message: err.message });
-            }
-            res.status(201).json({
-                message: 'User registered and logged in successfully',
-                user: {
-                    id: savedUser._id,
-                    username: savedUser.username,
-                    role: savedUser.role
-                }
-            });
-        });
-
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
     }
-};
 
-// @desc    Authenticate user (login)
-// @route   POST /api/auth/login
-// @access  Public
-const loginUser = (req, res, next) => {
+    const existing = await User.findOne({ username });
+    if (existing) {
+        return res.status(409).json({ message: 'Username already taken' });
+    }
+
+    // Create user (assumes User model handles password hashing in pre-save)
+    const user = new User({ username, password, ...rest });
+    await user.save();
+
+    // Return user without password
+    const safeUser = {
+        _id: user._id,
+        username: user.username,
+        role: user.role,
+        ...rest
+    };
+
+    res.status(201).json({ message: 'Registration successful', user: safeUser });
+});
+
+/**
+ * Login user using passport-local and create a session
+ * POST /api/auth/login
+ *
+ * Important: must call req.login(user, ...) so express-session writes the cookie.
+ */
+exports.loginUser = (req, res, next) => {
     passport.authenticate('local', (err, user, info) => {
-        if (err) {
-            return res.status(500).json({ message: err.message });
-        }
+        if (err) return next(err);
         if (!user) {
-            return res.status(401).json({ message: info.message || 'Login failed' });
+            return res.status(401).json({ message: info?.message || 'Invalid credentials' });
         }
 
-        // req.login is added by Passport. It establishes a session.
+        // Create session and send Set-Cookie header
         req.login(user, (err) => {
-            if (err) {
-                return res.status(500).json({ message: err.message });
-            }
-            res.status(200).json({
-                message: 'Logged in successfully',
-                user: {
-                    id: user._id,
-                    username: user.username,
-                    role: user.role
-                }
-            });
+            if (err) return next(err);
+
+            // Optionally, you can reload user from DB or strip sensitive fields
+            const safeUser = {
+                _id: user._id,
+                username: user.username,
+                role: user.role
+            };
+
+            return res.json({ message: 'Login successful', user: safeUser });
         });
     })(req, res, next);
 };
 
-// @desc    Logout user
-// @route   GET /api/auth/logout
-// @access  Private (requires login)
-const logoutUser = (req, res) => {
-    req.logout((err) => {
-        if (err) {
-            return res.status(500).json({ message: err.message });
+/**
+ * Logout user and destroy session
+ * GET /api/auth/logout
+ */
+exports.logoutUser = (req, res, next) => {
+    // passport >=0.6 supports callback for logout
+    req.logout(function (err) {
+        if (err) return next(err);
+
+        // Destroy server session and clear cookie
+        if (req.session) {
+            req.session.destroy((err) => {
+                if (err) {
+                    // Log but still attempt to clear cookie and respond
+                    console.error('Session destroy error:', err);
+                }
+                // Clear the cookie set by express-session
+                res.clearCookie('connect.sid', { path: '/' });
+                return res.json({ message: 'Logged out' });
+            });
+        } else {
+            // No session present
+            res.clearCookie('connect.sid', { path: '/' });
+            return res.json({ message: 'Logged out' });
         }
-        req.session.destroy();
-        res.status(200).json({ message: 'Logged out successfully' });
     });
 };
 
-// @desc    Get current user session
-// @route   GET /api/auth/session
-// @access  Private
-const getSession = (req, res) => {
-    if (req.isAuthenticated()) {
-        res.status(200).json({
-            user: {
-                id: req.user._id,
-                username: req.user.username,
-                role: req.user.role
-            }
-        });
-    } else {
-        res.status(401).json({ message: 'Not authenticated' });
+/**
+ * Get current session user
+ * GET /api/auth/session
+ */
+exports.getSession = asyncHandler(async (req, res) => {
+    if (req.isAuthenticated && req.isAuthenticated()) {
+        // req.user is set by passport.deserializeUser
+        const user = req.user;
+        const safeUser = {
+            _id: user._id,
+            username: user.username,
+            role: user.role
+        };
+        return res.json({ user: safeUser });
     }
-};
 
-module.exports = {
-    registerUser,
-    loginUser,
-    logoutUser,
-    getSession
-};
+    return res.status(401).json({ message: 'Not authenticated' });
+});

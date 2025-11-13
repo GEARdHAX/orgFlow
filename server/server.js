@@ -33,7 +33,14 @@ connectDB();
 // Init passport strategies
 require('./config/passport')(passport);
 
-const app = express();
+const app = express(); // <--- app is defined here!
+
+// --- CRITICAL FIX FOR RENDER/VERCEL ---
+// Tell Express to trust the proxy (Render's load balancer).
+// Required for 'secure: true' cookies to work behind a proxy.
+// MUST be AFTER 'const app = express();'
+app.set('trust proxy', 1);
+// --------------------------------------
 
 // ---------------------
 // CORS CONFIG
@@ -74,7 +81,7 @@ app.use(session({
     cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1 day
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",  // True on Render
+        secure: process.env.NODE_ENV === "production",   // True on Render
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
     }
 }));
