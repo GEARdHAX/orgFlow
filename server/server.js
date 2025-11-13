@@ -66,6 +66,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // --- Session and Authentication Middleware ---
+// --- Session and Authentication Middleware ---
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
@@ -74,8 +75,8 @@ app.use(session({
     cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1 day
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-        // SameSite: 'none' // Add this if you still have cookie issues in prod
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'none' // <-- ADD THIS LINE
     }
 }));
 
