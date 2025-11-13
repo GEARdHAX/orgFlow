@@ -7,98 +7,101 @@ const passport = require('passport');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 
-// Import custom middleware and config
+// Custom
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
-// Import routes
+// Routes
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const publicRoutes = require('./routes/publicRoutes');
 
-// Load .env variables
+// Load ENV
 dotenv.config();
 
-// --- CHANGE 1: Add Production Check ---
-// Crash the server if critical secrets are missing in production
+// Validate production env
 if (process.env.NODE_ENV === 'production') {
-    if (!process.env.DATABASE_URL) {
-        console.error('FATAL ERROR: DATABASE_URL is not set.');
-        process.exit(1);
-    }
-    if (!process.env.SESSION_SECRET) {
-        console.error('FATAL ERROR: SESSION_SECRET is not set.');
+    if (!process.env.DATABASE_URL || !process.env.SESSION_SECRET) {
+        console.error('❌ Missing critical environment variables.');
         process.exit(1);
     }
 }
-// ------------------------------------
 
-// Connect to Database
+// Connect DB
 connectDB();
 
-// Initialize Passport config
+// Init passport strategies
 require('./config/passport')(passport);
 
 const app = express();
 
-// --- Core Middleware ---
-
-// Enable CORS
-const clientUrl = process.env.CLIENT_URL ? process.env.CLIENT_URL.replace(/\/+$/, '') : ''; // Trim any trailing slashes
+// ---------------------
+// CORS CONFIG
+// ---------------------
+const clientUrl = process.env.CLIENT_URL?.replace(/\/+$/, '') || '';
 console.log('CORS CLIENT_URL (trimmed):', clientUrl);
 
 app.use(cors({
-    origin: clientUrl, // Use the trimmed URL
-    credentials: true // Allow cookies
+    origin: clientUrl,
+    credentials: true,
 }));
 
-// --- CHANGE 2: Configure Helmet ---
-// Set security HTTP headers.
-// Relax default policies that can block cross-origin (Vercel/Render) communication.
-app.use(helmet({
-    crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false,
-}));
-// ----------------------------------
+// ---------------------
+// HELMET CONFIG (REQUIRED for cross-site cookies)
+// ---------------------
+app.use(
+    helmet({
+        crossOriginEmbedderPolicy: false,
+        crossOriginOpenerPolicy: false,
+        crossOriginResourcePolicy: { policy: "cross-origin" }, // MUST HAVE
+    })
+);
 
-// Body parsers for JSON and URL-encoded data
+// Body Parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- Session and Authentication Middleware ---
-// --- Session and Authentication Middleware ---
+// ---------------------
+// SESSION MUST COME BEFORE PASSPORT
+// ---------------------
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: process.env.DATABASE_URL }),
+    store: MongoStore.create({
+        mongoUrl: process.env.DATABASE_URL
+    }),
     cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1 day
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // must be true in production
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // must be 'none' for cross-site cookies in productions
+        secure: process.env.NODE_ENV === "production",  // True on Render
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
     }
 }));
 
-// Initialize Passport
+// ---------------------
+// PASSPORT MUST COME AFTER SESSION
+// ---------------------
 app.use(passport.initialize());
-app.use(passport.session())
+app.use(passport.session());
 
-// --- Static Asset Serving ---
-// __dirname is fine in CommonJS (require syntax)
-app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
+// Static Files
+app.use('/uploads', express.static(path.join(__dirname, './uploads')));
 
-// --- API Routes ---
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
 
-// --- Error Handling Middleware ---
+// Error Middleware
 app.use(notFound);
 app.use(errorHandler);
 
-// --- Start Server ---
+// ---------------------
+// START SERVER
+// ---------------------
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
     console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });

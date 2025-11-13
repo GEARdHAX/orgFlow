@@ -1,44 +1,73 @@
 import { create } from 'zustand';
 import api from './api';
 
-// This store will hold the user state and login/logout functions
 export const useAuthStore = create((set) => ({
+
     user: null,
     isAuthenticated: false,
-    isLoading: true, // Start in loading state to check session
+    isLoading: true,   // App loads in "Checking Session" state
 
-    // Login function
+    // --------------------
+    // LOGIN
+    // --------------------
     login: async (username, password) => {
         try {
-            const res = await api.post('/auth/login', { username, password });
-            set({ user: res.data.user, isAuthenticated: true });
-        } catch (error) {
-            console.error('Login failed:', error.response?.data?.message);
-            throw error; // Re-throw to handle in the component
+            const res = await api.post(
+                '/auth/login',
+                { username, password },
+                { withCredentials: true } // IMPORTANT: forces cookie to be sent
+            );
+
+            set({
+                user: res.data.user,
+                isAuthenticated: true,
+            });
+        } catch (err) {
+            console.error("Login failed:", err.response?.data || err);
+            throw err;
         }
     },
 
-    // Logout function
+    // --------------------
+    // LOGOUT
+    // --------------------
     logout: async () => {
         try {
-            await api.get('/auth/logout');
-            set({ user: null, isAuthenticated: false });
-        } catch (error) {
-            console.error('Logout failed:', error);
+            await api.get('/auth/logout', { withCredentials: true });
+
+            set({
+                user: null,
+                isAuthenticated: false
+            });
+        } catch (err) {
+            console.error("Logout failed:", err);
         }
     },
 
-    // Check if session is still valid on page load
+    // --------------------
+    // SESSION CHECK
+    // --------------------
     checkAuth: async () => {
         try {
-            const res = await api.get('/auth/session');
-            set({ user: res.data.user, isAuthenticated: true, isLoading: false });
-        } catch (error) {
-            // Not authenticated
-            set({ user: null, isAuthenticated: false, isLoading: false });
+            const res = await api.get('/auth/session', {
+                withCredentials: true
+            });
+
+            set({
+                user: res.data.user,
+                isAuthenticated: true,
+                isLoading: false,
+            });
+
+        } catch (err) {
+            set({
+                user: null,
+                isAuthenticated: false,
+                isLoading: false,
+            });
         }
     },
 }));
 
-// Run checkAuth once when the app loads
+// Run checkAuth one time globally
 useAuthStore.getState().checkAuth();

@@ -2,37 +2,55 @@ const LocalStrategy = require('passport-local').Strategy;
 const User = require('../models/userModel');
 
 module.exports = function (passport) {
+
+    // -----------------------------
+    // Local Strategy (login)
+    // -----------------------------
     passport.use(
-        new LocalStrategy(async (username, password, done) => {
-            try {
-                const user = await User.findOne({ username: username });
+        new LocalStrategy(
+            {
+                usernameField: "username", // <-- REQUIRED
+                passwordField: "password",
+                passReqToCallback: false
+            },
+            async (username, password, done) => {
+                try {
+                    // Find user
+                    const user = await User.findOne({ username });
 
-                if (!user) {
-                    return done(null, false, { message: 'That username is not registered' });
-                }
+                    if (!user) {
+                        return done(null, false, { message: "User not found" });
+                    }
 
-                // Match password
-                const isMatch = await user.comparePassword(password);
-                if (isMatch) {
+                    // Check password
+                    const isMatch = await user.comparePassword(password);
+                    if (!isMatch) {
+                        return done(null, false, { message: "Incorrect password" });
+                    }
+
+                    // Success
                     return done(null, user);
-                } else {
-                    return done(null, false, { message: 'Password incorrect' });
+
+                } catch (err) {
+                    return done(err);
                 }
-            } catch (err) {
-                return done(err);
             }
-        })
+        )
     );
 
-    // Serializes user to store in session
+    // -----------------------------
+    // Serialize user → stores user.id inside session cookie
+    // -----------------------------
     passport.serializeUser((user, done) => {
-        done(null, user.id);
+        done(null, user._id);
     });
 
-    // Deserializes user from session
+    // -----------------------------
+    // Deserialize user → attach full user object to req.user
+    // -----------------------------
     passport.deserializeUser(async (id, done) => {
         try {
-            const user = await User.findById(id);
+            const user = await User.findById(id).select("-password"); // remove password
             done(null, user);
         } catch (err) {
             done(err);
