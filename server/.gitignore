@@ -1,0 +1,70 @@
+# -----------------------------------------------
+# --- Top-Level & General ---
+# -----------------------------------------------
+
+# Environment variables
+# CRITICAL: Do not commit sensitive keys
+.env
+.env.local
+.env.development
+.env.production
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# -----------------------------------------------
+# --- Node.js / Server ---
+# -----------------------------------------------
+
+# Node.js dependencies
+/server/node_modules/
+
+# Logs
+/server/logs/
+/server/npm-debug.log*
+/server/yarn-debug.log*
+/server/yarn-error.log*
+
+# Uploads directory
+# IMPORTANT: You typically don't commit user-uploaded content
+/server/uploads/
+
+# Runtime data
+/server/pids/
+/server/*.pid
+/server/*.seed
+
+
+# -----------------------------------------------
+# --- React / Client ---
+# -----------------------------------------------
+
+# React dependencies
+/client/node_modules/
+
+# React build output
+/client/build/
+/client/.next/
+
+# Create React App cache
+/client/.cra-cache/
+
+# Test reports
+/client/coverage/
+/client/*.lcov
+
+# Debug logs
+/client/npm-debug.log*
+/client/yarn-debug.log*
+/client/yarn-error.log*
