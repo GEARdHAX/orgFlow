@@ -1,212 +1,214 @@
-import { useEffect, useRef, useState } from 'react';
-import api from '../lib/api'; // Use our central API module
-import $ from "jquery";
-// Point directly to the minified JS file
-import "orgchart/dist/js/jquery.orgchart.min.js"; 
-import "orgchart/dist/css/jquery.orgchart.css";
-import { X } from "lucide-react";
+// import { useEffect, useRef, useState, useCallback } from "react";
+// import OrgChart from "@balkangraph/orgchart.js";
+// import api from "../lib/api";
+// import { registerOrgFlowTemplate } from "../utils/orgFlowTemplate";
+
+// const Hierarchy = () => {
+//   const chartRef = useRef(null);
+//   const chartInstance = useRef(null);
+//   const [selectedEmployee, setSelectedEmployee] = useState(null);
+
+//   const fetchHierarchy = useCallback(async () => {
+//     try {
+//       const response = await api.get("/public/hierarchy");
+//       const nested = response.data;
+
+//       const flatten = (nodes, parent = null) => {
+//         let res = [];
+//         nodes.forEach((n) => {
+//           res.push({
+//             id: n._id,
+//             pid: parent,
+//             name: n.name,
+//             title: n.role,
+//             img: n.photoUrl,
+//             email: n.email,
+//             phone: n.phone,
+//             dept: n.department,
+//             _fullData: n,
+//           });
+//           if (n.children) res.push(...flatten(n.children, n._id));
+//         });
+//         return res;
+//       };
+
+//       let flat = [];
+//       nested.forEach((root) => flat.push(...flatten([root], null)));
+
+//       // register theme
+//       registerOrgFlowTemplate();
+
+//       if (!chartInstance.current) {
+//         chartInstance.current = new OrgChart(chartRef.current, {
+//           template: "myTemplate",
+//           layout: OrgChart.layout.mixed,
+//           mode: "dark",
+//           nodeMouseClick: OrgChart.action.none,
+//           mouseScrool: OrgChart.action.scroll,
+//           enableSearch: false,
+//           nodeBinding: {
+//             field_0: "name",
+//             field_1: "title",
+//             img_0: "img",
+//             email: "email",
+//             phone: "phone",
+//           },
+//         });
+//       }
+
+//       chartInstance.current.load(flat);
+//     } catch (err) {
+//       console.error("Hierarchy error:", err);
+//     }
+//   }, []);
+
+//   useEffect(() => {
+//     fetchHierarchy();
+//   }, [fetchHierarchy]);
+
+//   return (
+//     <div className="pt-20 px-4 pb-10">
+//       <div className="max-w-7xl mx-auto">
+//         <h1 className="text-4xl font-bold text-center mb-8">
+//           Organization Chart
+//         </h1>
+
+//         <div className="w-full h-[700px] glass-strong rounded-2xl p-6">
+//           <div
+//             id="orgchart-container"
+//             ref={chartRef}
+//             style={{ width: "100%", height: "100%" }}
+//           ></div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default Hierarchy;
+
+
+import React, { useEffect, useRef, useState } from "react";
+import OrgChart from "@balkangraph/orgchart.js";
+import api from "../lib/api";
+import { registerCircleStyleTemplate } from "../utils/orgFlowTemplate";
 
 const Hierarchy = () => {
   const chartRef = useRef(null);
+  const chartInstance = useRef(null);
   const [loading, setLoading] = useState(true);
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
+  // Register Template Once
   useEffect(() => {
-    fetchHierarchy();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    registerCircleStyleTemplate();
   }, []);
 
+  // Fetch hierarchy from backend (axios)
   const fetchHierarchy = async () => {
-    setLoading(true);
     try {
-      const response = await api.get('/public/hierarchy');
-      const nestedTree = response.data;
+      const res = await api.get("/public/hierarchy");
+      console.log("Fetched Hierarchy:", res.data);
+      return res.data;
+    } catch (err) {
+      console.error("Hierarchy fetch error:", err);
+      return [];
+    }
+  };
 
-      const mapNode = (node) => ({
-        name: node.name,
-        title: node.role,
-        _fullData: node, 
-        children: node.children.map(mapNode),
+  // Convert Nested → Flat
+  const flattenTree = (node, parentId = null, flat = []) => {
+    if (!node) return flat;
+
+    flat.push({
+      id: node._id,
+      pid: parentId,
+      name: node.name,
+      title: node.role,
+      photoUrl: node.photoUrl,
+      tags: node.tags || [],
+    });
+
+    if (node.children?.length > 0) {
+      node.children.forEach((child) =>
+        flattenTree(child, node._id, flat)
+      );
+    }
+
+    return flat;
+  };
+
+  // Initialize Chart
+  useEffect(() => {
+    const loadChart = async () => {
+      if (!chartRef.current) {
+        console.warn("Chart container not ready");
+        return;
+      }
+
+      const treeData = await fetchHierarchy();
+      if (!treeData.length) return;
+
+      const flatData = flattenTree(treeData[0]);
+      console.log("Flattened Data:", flatData);
+
+      // Destroy previous instance
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+      }
+
+      // Create chart
+      chartInstance.current = new OrgChart(chartRef.current, {
+        template: "circleNode",
+        mode: "dark",
+        enableSearch: false,
+        mouseScrool: OrgChart.action.scroll,
+        scaleInitial: 1,
+        siblingSeparation: 10,
+        levelSeparation: 50,
+
+        nodeBinding: {
+          field_0: "name",
+          field_1: "title",
+          img_0: "photoUrl",
+        },
+
+        tags: {
+          root: { template: "circleRoot" },
+          orange: { template: "circleOrange" },
+          brown: { template: "circleBrown" },
+        },
+
+        nodes: flatData,
       });
-      
-      const chartDataRoots = nestedTree.map(mapNode);
 
-      const rootData = {
-        name: 'Organization',
-        title: 'Top Level',
-        className: 'invisible-root-node',
-        _fullData: { name: 'Organization', role: 'Root', email: '', department: '' },
-        children: chartDataRoots,
-      };
-
-      renderChart(rootData);
-    
-    } catch (error) {
-      console.error('Error fetching hierarchy:', error);
-    } finally {
       setLoading(false);
-    }
-  };
+    };
 
-  const renderChart = (data) => {
-    if (chartRef.current) {
-      chartRef.current.innerHTML = '';
-      $(chartRef.current).orgchart({
-        'data': data,
-        'nodeContent': 'title',
-        'direction': 't2b',
-        'pan': true,
-        'zoom': true,
-        'verticalLevel': 4,
-        'depth': 999,
-        'createNode': function(node, data) {
-          node.on('click', function(event) {
-            if (!event.isPropagationStopped()) {
-              if (data && data._fullData) {
-                if (!$(this).is('.invisible-root-node')) {
-                  setSelectedEmployee(data._fullData);
-                }
-              }
-            }
-          });
-        }
-      });
-    }
-  };
-
-  const closeModal = () => {
-    setSelectedEmployee(null);
-  };
+    loadChart();
+  }, []);
 
   return (
-    <div className="min-h-screen pt-20 px-4 pb-10" data-testid="hierarchy-page">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8" data-testid="hierarchy-title">
+    <div className="w-full h-full flex justify-center items-center relative flex-col">
+      <div>
+        <h1 className="text-4xl font-bold text-center mb-8">
           Organization Chart
         </h1>
-
-        {loading ? (
-          <div className="flex justify-center items-center h-96" data-testid="hierarchy-loading">
-            <div className="text-[#00E6C3] text-xl">Loading hierarchy...</div>
-          </div>
-        ) : (
-          // --- THIS IS THE CORRECTED HTML ---
-          // A simple container with padding, overflow, and a set height.
-          <div 
-            className="glass-strong rounded-2xl p-6 overflow-x-auto" 
-            style={{ minHeight: '700px' }} 
-            data-testid="hierarchy-chart-container"
-          >
-            {/* The single, empty div the library needs */}
-            <div
-              ref={chartRef}
-              id="chart-container"
-              className="orgchart-container"
-              style={{
-                '--node-bg': 'rgba(255, 255, 255, 0.07)',
-                '--node-border': '1px solid rgba(0, 230, 195, 0.3)',
-                '--line-color': '#00E6C3',
-              }}
-            ></div>
-          </div>
-          // --- END OF CORRECTED HTML ---
-        )}
       </div>
-
-      {/* Employee Details Modal */}
-      {selectedEmployee && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 px-4"
-          onClick={closeModal}
-          data-testid="employee-modal-overlay"
-        >
-          <div
-            className="glass-strong rounded-2xl p-8 max-w-md w-full relative"
-            onClick={(e) => e.stopPropagation()}
-            data-testid="employee-modal"
-          >
-            <button
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
-              onClick={closeModal}
-              data-testid="modal-close-btn"
-            >
-              <X size={24} />
-            </button>
-
-            <div className="flex flex-col items-center">
-              <img
-                src={selectedEmployee.photoUrl || '/uploads/default-avatar.png'}
-                alt={selectedEmployee.name}
-                className="w-24 h-24 rounded-full object-cover mb-4 border-2 border-[#00E6C3]"
-                data-testid="employee-photo"
-              />
-              <h2 className="text-2xl font-bold mb-2" data-testid="employee-name">{selectedEmployee.name}</h2>
-              <p className="text-[#00E6C3] font-semibold mb-4" data-testid="employee-role">{selectedEmployee.role}</p>
-
-              <div className="w-full space-y-3 text-left">
-                <div className="flex justify-between border-b border-gray-700 pb-2">
-                  <span className="text-[#C7C9D3]">Department:</span>
-                  <span className="font-semibold" data-testid="employee-department">{selectedEmployee.department}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-700 pb-2">
-                  <span className="text-[#C7C9D3]">Email:</span>
-                  <span className="font-semibold text-sm" data-testid="employee-email">{selectedEmployee.email}</span>
-                </div>
-                {selectedEmployee.reportsTo && (
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-[#C7C9D3]">Reports To (ID):</span>
-                    <span className="font-semibold text-xs" data-testid="employee-reports-to">{selectedEmployee.reportsTo}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+      {loading && (
+        <p style={{ color: "#ED9422", position: "absolute", top: "50%" }}>
+          Loading chart...
+        </p>
       )}
 
-      {/* Custom Styles */}
-      <style>{`
-        .orgchart-container .orgchart {
-          background: transparent;
-        }
-        .orgchart-container .invisible-root-node,
-        .orgchart-container .invisible-root-node + .lines .downLine {
-          display: none;
-        }
-        .orgchart-container .invisible-root-node .lines .downLine {
-            display: block;
-        }
-        .orgchart-container .node {
-          background: var(--node-bg);
-          border: var(--node-border);
-          color: #FFF;
-          border-radius: 12px;
-          padding: 12px;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          min-width: 150px;
-        }
-        .orgchart-container .node:hover {
-          background: rgba(255, 255, 255, 0.12);
-          box-shadow: 0 8px 24px rgba(0, 230, 195, 0.3);
-          transform: translateY(-3px);
-        }
-        .orgchart-container .node .title {
-          background: transparent;
-          color: #FFF;
-          font-weight: 500;
-          font-size: 14px;
-        }
-        .orgchart-container .lines .downLine,
-        .orgchart-container .lines .leftLine,
-        .orgchart-container .lines .rightLine,
-        .orgchart-container .lines .topLine {
-          background-color: var(--line-color);
-        }
-        .orgchart-container .oc-export-btn {
-          display: none;
-        }
-      `}</style>
+      <div
+        id="tree"
+        ref={chartRef}
+        style={{
+          width: "100%",
+          height: "100vh",
+          position: "relative",
+        }}
+      />
     </div>
   );
 };

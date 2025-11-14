@@ -64,25 +64,20 @@
   color: hsl(var(--foreground));
  }
 }}
+/* HIGHLIGHT COLORS */
+[data-l="0"] .level { stroke: #FFCA28; }
+[data-l="1"] .level { stroke: #039BE5; }
+[data-l="2"] .level { stroke: #F57C00; }
+[data-l="3"] .level { stroke: #7CB342; }
 
-#orgchart {
-  overflow: visible !important;
-}
+.selected[data-l="0"] > rect { stroke: #FFCA28; stroke-width: 3; }
+.selected[data-l="1"] > rect { stroke: #039BE5; stroke-width: 3; }
+.selected[data-l="2"] > rect { stroke: #F57C00; stroke-width: 3; }
+.selected[data-l="3"] > rect { stroke: #7CB342; stroke-width: 3; }
 
-.orgchart-container,
-#orgchart > div {
-  overflow: visible !important;
-}
-.orgchart-wrapper {
-  position: relative;
-  overflow: visible !important;
-}
+.green { fill: #4ADE80; }
 
-#chart-container *::-webkit-scrollbar {
-  display: none;
-}
 
-#chart-container {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+#tree {
+  background: #1b1b1b;
 }

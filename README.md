@@ -2,62 +2,62 @@
 
 A Modern Organization Management & Hierarchy Visualization System
 
-**OrgFlow** is a full-stack web application designed to help organizations manage employees, maintain structure, and visualize hierarchical relationships in a clean and interactive interface.
+**OrgFlow** is a full-stack MERN application that helps organizations manage employees, maintain hierarchy, and visualize reporting structure in a beautiful, interactive interface.
 
 ---
 
-## ⚠️ Authentication Issue Resolved — Why You Got 401 Errors (Important)
+# ⚠️ Authentication Issue Fixed — Why 401 Errors Happened
 
-### **The Problem: Why 401 Unauthorized Happened**
+When deploying the app (Frontend → Vercel, Backend → Render), protected API routes were returning:
 
-Your browser was **not sending the session cookie** back to the server after login.
-
-**What was happening step-by-step:**
-
-* **Login:** The server created a session and sent a session cookie to the browser.
-* **Cookie Rejected:** The cookie used `sameSite: 'none'`, but modern browsers require such cookies to also use `secure: true` (HTTPS only).
-* **Conflict:** In development, you're using `http://localhost` (not HTTPS).
-* **Browser Block:** The browser refused the cookie because it was considered insecure.
-* **Result:** Future API calls had **no session cookie**, so the server returned **401 Unauthorized**.
-
----
-
-### **The Solution: Environment-Based Cookie Settings**
-
-Your `server.js` was updated to adjust cookie security depending on whether you're running locally (dev) or deployed (production).
-
-```js
-app.use(session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: process.env.DATABASE_URL }),
-    cookie: {
-        maxAge: 1000 * 60 * 60 * 24,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-    }
-}));
+```
+401 Unauthorized
 ```
 
-### **How This Fix Works**
+This happened because the browser **was not receiving or storing the session cookie** (`connect.sid`) from the backend.
 
-#### **In Development (localhost)**
+### **Root Causes**
 
-* `secure: false`
-* `sameSite: 'lax'`
+* **Proxy Issue:** Render runs behind a reverse proxy → Express saw requests as HTTP → refused to send `secure` cookies.
+* **Missing Session Creation:** Passport authenticated users but no session was created because `req.login()` was missing.
+* **Helmet Blocking Cookies:** Default Helmet settings blocked cross-origin cookies.
+* **Environment Mismatch:** Cookie settings must differ in dev (HTTP) vs production (HTTPS).
 
-Browsers accept the cookie on HTTP during development → login works normally.
+---
 
-#### **In Production**
+### **Final Fixes Implemented**
 
-* `secure: true`
-* `sameSite: 'none'`
+#### ✔ 1. Enable proxy trust (required on Render)
 
-Correct, secure configuration for deployed HTTPS environments → supports cross-domain cookies.
+```js
+app.set("trust proxy", 1);
+```
 
-This ensures compatibility with browser security rules in both environments and prevents the 401 Unauthorized errors you were facing.
+#### ✔ 2. Correct environment-based session cookie settings
+
+```js
+secure: process.env.NODE_ENV === "production",
+sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+```
+
+* Localhost → HTTP friendly
+* Production → Cross-site + HTTPS safe
+
+#### ✔ 3. Added required Passport call for creating sessions
+
+```js
+req.login(user, () => { ... });
+```
+
+#### ✔ 4. Updated Helmet to allow cross-origin cookies
+
+```js
+crossOriginResourcePolicy: { policy: "cross-origin" }
+```
+
+**Result:**
+Cookies are now sent, stored, and included in all authenticated requests.
+Protected routes work correctly in production.
 
 ---
 
@@ -65,50 +65,49 @@ This ensures compatibility with browser security rules in both environments and 
 
 ### 🔐 Secure Authentication
 
-* Admin login using **JWT + HTTP-only cookies**
+* Session-based admin login
+* HTTP-only cookies
+* Persistent authenticated sessions
 * Protected admin routes
-* Automatic redirect handling
 
 ### 👥 Employee Management
 
-* Add employees
-* Assign hierarchy
+* Add/edit/delete employees
+* Assign reporting hierarchy
 * Cloudinary image uploads
-* Edit & delete
-* View details via modal
+* Modal-based employee profiles
 
-### 🗂️ Dynamic Organization Chart
+### 🗂️ Organization Chart
 
-* Auto-generated tree
-* Interactive org chart
-* Pan & zoom
-* Infinite canvas movement
-* Click nodes for details
+* Auto-generated hierarchical tree
+* jQuery.orgchart integration
+* Pan, zoom, drag, infinite canvas
+* Click nodes for full details
 
 ### 📊 Admin Dashboard
 
-* Overview metrics
-* Quick controls
+* Metrics overview
+* Quick actions
 * Clean responsive UI
 
 ### 🎨 Modern UI/UX
 
-* React + Tailwind
+* React + Tailwind CSS
 * Glassmorphism theme
-* Fully responsive
-* Smooth interactions
+* Fully responsive and smooth
 
 ### ⚙️ Robust Backend
 
 * Express + MongoDB
-* JWT auth
 * Cloudinary uploads
 * Multer handling
 * Async error wrapper
+* Passport (Local Strategy)
+* Session-based auth
 
 ---
 
-## 🛠️ Technologies Used
+# 🛠️ Technologies Used
 
 ### Frontend
 
@@ -123,25 +122,17 @@ This ensures compatibility with browser security rules in both environments and 
 
 * Node.js / Express
 * MongoDB + Mongoose
-* JWT + Bcrypt
+* Passport + express-session
 * Cloudinary
 * Multer
 * CORS
-* Cookie-parser
+* Helmet
 
 ---
 
-## 🚀 Getting Started
+# 🚀 Getting Started
 
-### Prerequisites
-
-* Node.js v18+
-* MongoDB Atlas or local
-* Cloudinary
-
----
-
-## 📁 1. Clone the Repository
+## 1️⃣ Clone the Repository
 
 ```bash
 git clone <your-repo-url>
@@ -150,21 +141,21 @@ cd orgflow
 
 ---
 
-## 🖥️ 2. Backend Setup (server)
+# 🖥️ 2️⃣ Backend Setup (server)
 
 ```bash
 cd server
 npm install
 ```
 
-### Add `.env`
+### Create `.env` inside `/server`
 
 ```env
 PORT=5000
-MONGO_URI=your_mongodb_connection_string
-SESSION_SECRET=your_secret
 DATABASE_URL=your_mongo_url
-CLIENT_URL=http://localhost:3000
+SESSION_SECRET=your_secret
+CLIENT_URL=http://localhost:5173
+NODE_ENV=development
 ```
 
 ### Start Backend
@@ -173,18 +164,19 @@ CLIENT_URL=http://localhost:3000
 npm start
 ```
 
-Backend → `http://localhost:5000`
+Backend runs at:
+`http://localhost:5000`
 
 ---
 
-## 🌐 3. Frontend Setup (client)
+# 🌐 3️⃣ Frontend Setup (client)
 
 ```bash
 cd ../client
 npm install
 ```
 
-### Add `.env`
+### Create `.env` inside `/client`
 
 ```env
 VITE_BACKEND_URL=http://localhost:5000
@@ -196,37 +188,45 @@ VITE_BACKEND_URL=http://localhost:5000
 npm run dev
 ```
 
-Frontend → `http://localhost:3000`
+Frontend runs at:
+`http://localhost:5173`
 
 ---
 
-## 🌍 Deployment
+# 🌍 Deployment
 
-### Backend → Render
+## Backend → Render
 
 * Root: `server`
 * Build: `npm install`
 * Start: `npm start`
-* Add all env variables
-* `CLIENT_URL` = your Vercel domain
+* Required ENV:
 
-### Frontend → Vercel
+  * `DATABASE_URL`
+  * `SESSION_SECRET`
+  * `CLIENT_URL=https://your-vercel-app.vercel.app`
+  * `NODE_ENV=production`
+
+## Frontend → Vercel
 
 * Root: `client`
-* Add env variable
-  `VITE_BACKEND_URL = <render-url>`
+* ENV:
+
+  ```env
+  VITE_BACKEND_URL=https://your-render-api-url.onrender.com
+  ```
 
 ---
 
-## 🤝 Contributing
+# 🤝 Contributing
 
-Issues and PRs are welcome.
+Open an issue or submit a PR — contributions are welcome!
 
 ---
 
-## 📝 License
+# 📝 License
 
-Unlicensed — free to use, modify, and distribute.
+This project is **Unlicensed** — free to use, modify, and distribute.
 
 ---
 
