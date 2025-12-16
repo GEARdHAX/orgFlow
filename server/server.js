@@ -99,6 +99,9 @@ app.use('/uploads', express.static(path.join(__dirname, './uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);
+app.get("/health", (req, res) => {
+    res.status(200).send("OK");
+});
 
 // Error Middleware
 app.use(notFound);
